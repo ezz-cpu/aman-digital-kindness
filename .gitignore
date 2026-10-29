@@ -1,0 +1,14 @@
+node_modules/
+.data/
+test-results/
+release/
+.env
+.env.*
+!.env.example
+/godot-game/
+/pictoblox/
+*.exe
+*.sb3
+*.zip
+[Dd]esktop.ini
+*.log

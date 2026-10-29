@@ -1,0 +1,29 @@
+{
+  "name": "aman-digital-kindness",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A bilingual digital safety and cyberbullying awareness website.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build:browser": "node tools/build-scene.mjs",
+    "test": "node --test tests/auth.test.js tests/tobi.test.js tests/tobi-connection.test.js tests/tobi-public.test.js",
+    "test:tobi": "node tests/tobi-browser.mjs && node tests/tobi-cancel.mjs",
+    "test:tobi-ai": "node tests/tobi-connection-browser.mjs",
+    "test:tobi-public": "node tests/tobi-public-browser.mjs",
+    "test:ui": "node tests/browser.mjs",
+    "test:a11y": "node tests/accessibility.mjs",
+    "test:scene": "node tests/scene.mjs",
+    "test:local": "node tests/local-open.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "axe-core": "^4.14.0",
+    "esbuild": "^0.28.2",
+    "three": "^0.169.0"
+  }
+}
