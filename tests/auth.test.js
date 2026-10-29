@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -20,7 +21,7 @@ async function request(route, { method = 'GET', data, cookie, origin } = {}) {
 before(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'aman-auth-test-'));
   server = await createApp({ dataDir });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenForTests(server);
   base = `http://127.0.0.1:${server.address().port}`;
 });
 after(async () => {

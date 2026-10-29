@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import path from 'node:path';
+import { deriveSecret } from './server-secrets.js';
 
 const invalid = () => Object.assign(new Error('invalid_fields'), { status: 400 });
 const policyFields = 'audience,networkDailyLimit,siteDailyLimit,visitorDailyLimit';
@@ -48,30 +49,32 @@ export function clientAddress(req, trustedHops = 0) {
   return trusted[0];
 }
 
-export async function createPublicAccessStore({ db, dataDir, dailyLimit, secureCookies }) {
+export async function createPublicAccessStore({ db, dataDir, dailyLimit, secureCookies, masterSecret = '' }) {
   const defaults = validatePolicy({ audience: 'public', siteDailyLimit: dailyLimit, visitorDailyLimit: 10, networkDailyLimit: 100 });
-  db.exec(`CREATE TABLE IF NOT EXISTS tobi_policy (id INTEGER PRIMARY KEY CHECK(id=1), document TEXT NOT NULL);
+  await db.exec(`CREATE TABLE IF NOT EXISTS tobi_policy (id INTEGER PRIMARY KEY CHECK(id=1), document TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS tobi_network_usage (day TEXT NOT NULL, network_id TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(day,network_id));`);
-  db.prepare('INSERT OR IGNORE INTO tobi_policy VALUES(1,?)').run(JSON.stringify(defaults));
+  await db.run('INSERT INTO tobi_policy VALUES(1,?) ON CONFLICT(id) DO NOTHING', JSON.stringify(defaults));
   const secretPath = path.join(dataDir, 'tobi-visitor-secret.bin');
-  let secret;
-  try { secret = await readFile(secretPath); }
-  catch (error) {
-    if (error.code !== 'ENOENT') throw new Error('Could not open the private Tobi visitor secret.');
-    try {
-      secret = randomBytes(32);
-      await writeFile(secretPath, secret, { flag: 'wx', mode: 0o600 });
-    } catch (writeError) {
-      if (writeError.code !== 'EEXIST') throw new Error('Could not save the private Tobi visitor secret.');
-      secret = await readFile(secretPath);
+  let secret = deriveSecret(masterSecret, 'visitors');
+  if (!secret) {
+    try { secret = await readFile(secretPath); }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw new Error('Could not open the private Tobi visitor secret.');
+      try {
+        secret = randomBytes(32);
+        await writeFile(secretPath, secret, { flag: 'wx', mode: 0o600 });
+      } catch (writeError) {
+        if (writeError.code !== 'EEXIST') throw new Error('Could not save the private Tobi visitor secret.');
+        secret = await readFile(secretPath);
+      }
     }
   }
   if (secret.length !== 32) throw new Error('The private Tobi visitor secret needs to be restored.');
   const hash = value => createHmac('sha256', secret).update(value).digest('hex');
-  const read = () => validatePolicy(JSON.parse(db.prepare('SELECT document FROM tobi_policy WHERE id=1').get().document));
-  function save(policy) {
+  const read = async (store = db) => validatePolicy(JSON.parse((await store.get('SELECT document FROM tobi_policy WHERE id=1')).document));
+  async function save(policy) {
     validatePolicy(policy);
-    db.prepare('UPDATE tobi_policy SET document=? WHERE id=1').run(JSON.stringify(policy));
+    await db.transaction(tx => tx.run('UPDATE tobi_policy SET document=? WHERE id=1', JSON.stringify(policy)));
     return read();
   }
   function visitor(req, res, user) {
@@ -86,30 +89,28 @@ export async function createPublicAccessStore({ db, dataDir, dailyLimit, secureC
     return `guest:${hash(`visitor:${id}`)}`;
   }
   const network = req => hash(`network:${req.clientAddress || normalizedAddress(req.socket.remoteAddress) || 'unknown'}`);
-  function usage(userId) {
+  async function usage(userId, store = db) {
     const day = new Date().toISOString().slice(0, 10);
     return {
-      site: db.prepare('SELECT COALESCE(SUM(count),0) AS n FROM tobi_usage WHERE day=?').get(day).n,
-      user: userId ? db.prepare('SELECT count FROM tobi_usage WHERE day=? AND user_id=?').get(day, userId)?.count || 0 : 0,
+      site: Number((await store.get('SELECT COALESCE(SUM(count),0) AS n FROM tobi_usage WHERE day=?', day)).n),
+      user: userId ? Number((await store.get('SELECT count FROM tobi_usage WHERE day=? AND user_id=?', day, userId))?.count || 0) : 0,
     };
   }
-  function reserve(visitorId, networkId) {
+  async function reserve(visitorId, networkId) {
     const day = new Date().toISOString().slice(0, 10);
-    db.exec('BEGIN IMMEDIATE');
-    try {
-      db.prepare('DELETE FROM tobi_usage WHERE day<?').run(day);
-      db.prepare('DELETE FROM tobi_network_usage WHERE day<?').run(day);
-      const policy = read(), used = usage(visitorId);
-      const networkUsed = db.prepare('SELECT count FROM tobi_network_usage WHERE day=? AND network_id=?').get(day, networkId)?.count || 0;
+    return db.transaction(async tx => {
+      await tx.run('DELETE FROM tobi_usage WHERE day<?', day);
+      await tx.run('DELETE FROM tobi_network_usage WHERE day<?', day);
+      const policy = await read(tx), used = await usage(visitorId, tx);
+      const networkUsed = Number((await tx.get('SELECT count FROM tobi_network_usage WHERE day=? AND network_id=?', day, networkId))?.count || 0);
       const reason = used.site >= policy.siteDailyLimit ? 'daily_limit' : used.user >= policy.visitorDailyLimit ? 'visitor_limit' : networkUsed >= policy.networkDailyLimit ? 'network_limit' : null;
       if (!reason) {
         // Reserve all budgets before contacting the provider, including failures and tests.
-        db.prepare('INSERT INTO tobi_usage VALUES(?,?,1) ON CONFLICT(day,user_id) DO UPDATE SET count=count+1').run(day, visitorId);
-        db.prepare('INSERT INTO tobi_network_usage VALUES(?,?,1) ON CONFLICT(day,network_id) DO UPDATE SET count=count+1').run(day, networkId);
+        await tx.run('INSERT INTO tobi_usage VALUES(?,?,1) ON CONFLICT(day,user_id) DO UPDATE SET count=tobi_usage.count+1', day, visitorId);
+        await tx.run('INSERT INTO tobi_network_usage VALUES(?,?,1) ON CONFLICT(day,network_id) DO UPDATE SET count=tobi_network_usage.count+1', day, networkId);
       }
-      db.exec('COMMIT');
       return reason;
-    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    });
   }
   return { read, save, visitor, network, usage, reserve };
 }

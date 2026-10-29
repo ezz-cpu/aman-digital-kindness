@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
@@ -16,7 +17,7 @@ async function fixture(options = {}) {
   const tobiOptions = { apiKey: '', ...options, aiFetch: async (url, request) => { calls.push({ url, request }); return handler(url, request); } };
   async function start() {
     server = await createApp({ dataDir, tobiOptions });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    await listenForTests(server);
     base = `http://127.0.0.1:${server.address().port}`;
   }
   await start();

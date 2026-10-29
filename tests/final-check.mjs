@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -9,7 +10,7 @@ import { createApp } from '../server.js';
 const require = createRequire(import.meta.url);
 const dataDir = await mkdtemp(path.join(tmpdir(), 'aman-final-test-'));
 const server = await createApp({ dataDir });
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+await listenForTests(server);
 const base = `http://127.0.0.1:${server.address().port}`;
 const chrome = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || (existsSync(chrome) ? chrome : undefined) });

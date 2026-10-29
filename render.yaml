@@ -1,0 +1,30 @@
+# Free web service; accounts live in a separate Neon Free PostgreSQL database.
+# No paid disk or expiring Render database is created by this blueprint.
+services:
+  - type: web
+    name: aman-full-site
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build:browser && npm prune --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    numInstances: 1
+    autoDeployTrigger: off
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_SECRET
+        generateValue: true
+      - key: TOBI_OWNER_CODE
+        generateValue: true
+      - key: TRUST_PROXY_HOPS
+        value: "0"

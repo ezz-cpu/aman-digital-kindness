@@ -3,7 +3,10 @@
 !Dockerfile
 !.dockerignore
 !package.json
+!package-lock.json
 !server.js
+!database.js
+!server-secrets.js
 !tobi-service.js
 !tobi-ai.js
 !tobi-public.js

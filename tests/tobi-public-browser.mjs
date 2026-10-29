@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -185,7 +186,7 @@ try {
       },
     },
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  await listenForTests(server);
   const port = server.address().port;
   base = `http://127.0.0.1:${port}`;
   const installedChrome = 'C:/Program Files/Google/Chrome/Application/chrome.exe';

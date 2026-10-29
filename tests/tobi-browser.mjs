@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm,mkdir} from 'node:fs/promises';
@@ -5,7 +6,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createApp} from '../server.js';
 const dataDir=await mkdtemp(path.join(tmpdir(),'aman-tobi-browser-'));
-const server=await createApp({dataDir,tobiOptions:{apiKey:''}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const server=await createApp({dataDir,tobiOptions:{apiKey:''}});await listenForTests(server);
 const base=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1050},reducedMotion:'reduce'});

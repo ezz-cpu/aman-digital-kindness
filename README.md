@@ -4,7 +4,9 @@ A complete Arabic / English cyberbullying awareness website with an animated int
 
 ## Public website
 
-Share **https://ezz-cpu.github.io/aman-digital-kindness/** to explore the guides, games, and Tobi's free notebook. The GitHub Pages version does not offer account sign-in or AI chat; those features work when the Node.js server is hosted. The public build identifies this clearly and never requests passwords or server APIs.
+The full site supports **free Render hosting with a Neon Free PostgreSQL database**, including sign-up, login, saved progress, and Tobi Studio. [Follow the setup guide](DEPLOYMENT.md), then [deploy the free service](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fezz-cpu%2Faman-digital-kindness). The blueprint creates no paid disk or Render database. Hosting has free-tier limits and can take about a minute to wake after 15 minutes idle; OpenAI usage is separate. These files prepare deployment; they do not create a live server automatically.
+
+The existing **https://ezz-cpu.github.io/aman-digital-kindness/** link offers the guides, games, and Tobi's free notebook. After deploying the full server, share its HTTPS link for accounts and AI. GitHub Pages cannot run the account server; its public build identifies this clearly and never requests passwords or server APIs.
 
 Run `npm run build:browser` followed by `npm run build:pages` to generate the public assets in `release/pages/`. Publish that directory to the `codex/pages` branch. The build copies an explicit browser-file allowlist and marks its HTML for public play without a server.
 
@@ -19,7 +21,7 @@ npm install
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. The website needs this server for accounts and saved progress; opening the HTML directly or using a static-only server cannot provide authentication. The server has no runtime npm dependencies. The 3D library is served from the local `vendor/three/` folder; `npm install` installs development and browser-testing tools.
+Open **http://127.0.0.1:3000**. The website needs this server for accounts and saved progress; opening the HTML directly or using a static-only server cannot provide authentication. Local SQLite uses Node's built-in database; PostgreSQL uses the `pg` runtime dependency. The 3D library is served from the local `vendor/three/` folder. `npm install` also installs development and browser-testing tools.
 
 ## Included
 
@@ -43,9 +45,9 @@ Open **http://127.0.0.1:3000**. The website needs this server for accounts and s
 
 ## Data and deployment
 
-Account and progress data live in `.data/aman.sqlite`. Keep `.data/` private and persistent, and include it in your backup plan. The old browser-only login was replaced; previous localStorage credentials are cleared, and users should create a new account.
+With no `DATABASE_URL`, account and progress data live in `.data/aman.sqlite`. Keep `.data/` private and persistent. With `DATABASE_URL`, all account, session, progress, owner, Tobi configuration, encrypted credential, and daily quota tables live in PostgreSQL. This mode survives replacement of the web server's entire local filesystem. Local accounts are not automatically copied into a new hosted database.
 
-Preserve the entire data directory, including `.data/tobi-keyring.bin` and `.data/tobi-visitor-secret.bin`, with the database so encrypted credentials and visitor limits can be restored. Chat text is not saved by the app. Public AI uses a signed essential visitor cookie and HMAC network counters.
+For local SQLite, preserve the entire data directory, including `.data/tobi-keyring.bin` and `.data/tobi-visitor-secret.bin`. PostgreSQL deployments instead require a stable private `APP_SECRET` in the hosting environment; it derives separate encryption and visitor-signing keys and must be backed up alongside database backups. `TOBI_OWNER_CODE` allows the first owner to claim the studio once. Render generates both secrets once. Chat text is not saved by the app. Public AI uses a signed essential visitor cookie and HMAC network counters.
 
 Environment variables:
 
@@ -53,16 +55,19 @@ Environment variables:
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP listening port |
 | `HOST` | `127.0.0.1` | Listening interface; use `0.0.0.0` in a hosted container if needed |
-| `DATA_DIR` | `.data` in this project | Persistent database directory |
+| `DATA_DIR` | `.data` in this project | Local SQLite database and private files; not account storage in PostgreSQL mode |
+| `DATABASE_URL` | unset | Private PostgreSQL connection string; Neon Free supports the free hosting setup |
+| `APP_SECRET` | unset | Required with PostgreSQL; stable private value of at least 32 characters |
+| `TOBI_OWNER_CODE` | unset | Required with PostgreSQL; private one-time studio setup code, 32–100 characters |
 | `NODE_ENV` | unset | Set to `production` behind HTTPS to enable Secure cookies |
-| `APP_ORIGIN` | inferred from the Host header | Exact public origin, such as `https://aman.example`, when behind a proxy |
+| `APP_ORIGIN` | `RENDER_EXTERNAL_URL`, then the Host header | Exact public origin, such as `https://aman.example`, when behind a proxy |
 | `TRUST_PROXY_HOPS` | `0` | Number of actual trusted proxy hops, from 0 to 10; leave 0 unless the deployment topology is verified |
 
-For public deployment, follow the Arabic [deployment guide](DEPLOYMENT.md). Use HTTPS, set `NODE_ENV=production` and `APP_ORIGIN`, and preserve the data directory. The Dockerfile runs Node 24 as a nonroot user with persistent `/data`; it requires prebuilt browser bundles and no npm runtime dependencies. `GET /api/health` reports readiness. Run one server instance only.
+For public deployment, follow the Arabic [deployment guide](DEPLOYMENT.md). Use HTTPS and `NODE_ENV=production`. The Render blueprint uses external PostgreSQL and refuses to start without its connection settings and durable secrets. On other hosts, the Dockerfile runs Node 24 as a nonroot user and installs runtime dependencies; it requires prebuilt browser bundles. Local SQLite needs persistent `/data`. `GET /api/health` reports server readiness. Run one server instance only.
 
-Daily AI quotas are persisted in SQLite. Short request-rate limits and the concurrency cap live in the server process. Configure `TRUST_PROXY_HOPS` only for the actual trusted topology and block direct access to the backend; otherwise forwarded client headers must not be trusted. A reverse proxy should also enforce client rate limits.
+Daily AI quotas are persisted in the selected database and reserved transactionally before provider requests. Short request-rate limits and the concurrency cap live in the server process. Configure `TRUST_PROXY_HOPS` only for the actual trusted topology and block direct access to the backend; otherwise forwarded client headers must not be trusted. A reverse proxy should also enforce client rate limits.
 
-To create a clean deployment ZIP after rebuilding, run `node tools/package-website.mjs --check` and then `node tools/package-website.mjs`. The archive contains only an explicit runtime allowlist and a minimal package manifest. It excludes `.env`, `.data`, development dependencies, tests, and original game projects. The archive does not contain your owner account or API key; set those up privately on the hosted server. Packaging does not publish the site.
+To create a clean deployment ZIP after rebuilding, run `node tools/package-website.mjs --check` and then `node tools/package-website.mjs`. The archive contains an explicit runtime allowlist and matching runtime package/lock files. It excludes `.env`, `.data`, installed dependencies, tests, and original game projects. Run `npm ci --omit=dev` in the extracted folder for PostgreSQL hosting; local SQLite can run without it. The archive does not contain your accounts or secrets; set them up privately on the host. Packaging does not publish the site.
 
 Email verification, password recovery, social login, and email delivery are not configured. The support panel provides educational guidance; it is not a live reporting or emergency service. No analytics or advertising are included. Google Fonts requires an internet connection; system fonts are used if unavailable.
 
@@ -79,6 +84,6 @@ npm run test:tobi-public
 npm run test:local
 ```
 
-The UI test uses installed Chrome on Windows. Set `CHROME_PATH` for a different executable, or run `npx playwright install chromium` to use Playwright's browser. Account and UI tests create temporary databases and remove only their own data afterward. UI screenshots are written to `test-results/`. Run `npm start` before `npm run test:a11y`; the read-only accessibility check audits public pages in both languages on port 3000. API connection tests use simulated provider replies, never real API keys.
+The UI test uses installed Chrome on Windows. Set `CHROME_PATH` for a different executable, or run `npx playwright install chromium` to use Playwright's browser. Account and UI tests create temporary databases and remove only their own data afterward. PostgreSQL tests run the production adapter against PGlite's PostgreSQL engine, including concurrent signup/owner claims, encrypted credentials, quota transactions, and restarts with an empty application directory; they do not require cloud credentials. UI screenshots are written to `test-results/`. Run `npm start` before `npm run test:a11y`; the read-only accessibility check audits public pages in both languages on port 3000. API connection tests use simulated provider replies, never real API keys.
 
 After editing `aman-scene.js`, `tobi.js`, or `tobi-content.js`, run `npm run build:browser` to regenerate the classic browser bundles used by both direct-file and HTTP opening. Stylesheets do not need rebuilding.

@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +19,7 @@ const server = http.createServer(async (req, res) => {
   try { const body = await readFile(file); res.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'text/plain' }); res.end(body); }
   catch { res.writeHead(404).end(); }
 });
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+await listenForTests(server);
 const port = server.address().port;
 const base = `http://127.0.0.1:${port}${prefix}`;
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: [`--explicitly-allowed-ports=${port}`] });

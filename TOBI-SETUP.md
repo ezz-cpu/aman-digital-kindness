@@ -15,7 +15,7 @@ Opening index.html directly now also renders the actual 3D scene. Opening tobi.h
 
 1. Sign in to your website account or create an account.
 2. Open Tobi Studio.
-3. For first-time setup, copy the code from the private `.data/tobi-owner-code.txt` file on the computer running the website into the setup form.
+3. For first-time setup on Render, copy the private `TOBI_OWNER_CODE` value from your service's **Environment** settings into the setup form. For local SQLite, use `.data/tobi-owner-code.txt` on the computer running the website.
 4. Your account now owns the Studio. The one-time code expires; only that owner account can edit Tobi or manage AI.
 
 Existing owners keep access. You can edit greetings, animation, enabled activities, notebook answers, and quiz questions in Arabic and English. Save changes, then reopen the game.
@@ -34,7 +34,7 @@ No server restart is needed for Studio changes. A blank key field keeps the curr
 
 The default is [GPT-5.6 Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), an economical model supporting `reasoning.effort: none`. Other custom models are sent without that model-specific parameter. Access depends on the OpenAI account.
 
-**OpenAI API requests may consume paid API credit.** Saving is local; connection testing and AI conversations make requests. Configure the provider account’s spending controls as well. Development checks use mock responses and never call OpenAI with a real key.
+**OpenAI API requests may consume paid API credit.** Saving only stores the encrypted key in the website's database; connection testing and AI conversations make provider requests. Configure the provider account’s spending controls as well. Development checks use mock responses and never call OpenAI with a real key.
 
 ## Choose how Tobi replies
 
@@ -58,13 +58,15 @@ Home, Stop, and disabling AI cancel pending requests. There are no automatic pai
 
 ## Private data and deployment
 
-Studio credentials are encrypted with AES-256-GCM in the private `.data/aman.sqlite` database. The encryption key is in `.data/tobi-keyring.bin`, and the visitor-signing secret is in `.data/tobi-visitor-secret.bin`. **Back up the entire private data directory together.** These files, and the server implementation, are excluded from public serving. Owner-only APIs return connection status, never saved key text.
+Studio credentials are encrypted with AES-256-GCM. On free Render/Neon hosting, the ciphertext lives in PostgreSQL and separate encryption and visitor-signing keys derive from the private `APP_SECRET` environment value. **Preserve the database and APP_SECRET together across deployments and backups.** Render generates the secret once; do not replace it when updating the code. No local server files are needed for accounts, settings, or visitor identities in this mode.
+
+For local SQLite, the database is `.data/aman.sqlite`, the encryption key is `.data/tobi-keyring.bin`, and the visitor-signing secret is `.data/tobi-visitor-secret.bin`. **Back up the entire private data directory together.** These files, hosting secrets, and server implementation are excluded from public serving. Owner-only APIs return connection status, never saved key text.
 
 Existing `OPENAI_API_KEY` and `OPENAI_MODEL` environment configuration remains supported until replaced or disconnected in the Studio. Environment changes require a server restart. Keep `.env` private.
 
 Settings, owner identity, scores, request counters, and connection-test status are stored on the server. Public AI uses an essential signed HttpOnly visitor cookie and HMAC network counters; raw IP addresses are not stored in Tobi's usage tables. Conversation text stays in the current browser page and is not stored in the app database. When AI is used, recent conversation text is sent to OpenAI. Requests use `store: false`; this does not replace OpenAI’s own data-handling policies.
 
-For public hosting, follow the Arabic [deployment guide](DEPLOYMENT.md) for HTTPS, persistent data, one server instance, and trusted-proxy configuration. It includes Docker and clean ZIP packaging. A fresh deployment starts without local accounts or credentials; claim the owner account using the code from that server's private data directory, then connect your key.
+For public hosting, follow the Arabic [deployment guide](DEPLOYMENT.md) for the free Render/Neon setup, HTTPS, persistent data, one server instance, and trusted-proxy configuration. It also includes Docker and clean ZIP packaging. A fresh database starts without local accounts or credentials; claim the owner account using the hosted environment code (or the private local file for SQLite), then connect your key.
 
 The integration follows [official OpenAI text-generation documentation](https://developers.openai.com/api/docs/guides/text) and [API key storage guidance](https://developers.openai.com/api/docs/guides/production-best-practices).
 

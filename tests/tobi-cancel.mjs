@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
@@ -7,7 +8,7 @@ import {createApp} from '../server.js';
 const dataDir=await mkdtemp(path.join(tmpdir(),'aman-tobi-cancel-'));
 let started=false,aborted=false;
 const server=await createApp({dataDir,tobiOptions:{apiKey:'test-only-no-real-request',aiFetch:async(_url,{signal})=>new Promise((_resolve,reject)=>{started=true;signal.addEventListener('abort',()=>{aborted=true;reject(new Error('Cancelled test request'));},{once:true});})}});
-await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
+await listenForTests(server);const base=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({channel:'chrome',headless:true,args:[`--explicitly-allowed-ports=${server.address().port}`]});
 try{
  const context=await browser.newContext();await context.addInitScript(()=>localStorage.setItem('aman-language','en'));

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Never recurse over the workspace: personal data and credentials are not deliverables.
 const allowedFiles = [
-  'server.js', 'tobi-service.js', 'tobi-ai.js', 'tobi-public.js', 'tobi-content.js',
+  'server.js', 'database.js', 'server-secrets.js', 'tobi-service.js', 'tobi-ai.js', 'tobi-public.js', 'tobi-content.js',
   'index.html', 'about.html', 'resources.html', 'interactive.html', 'login.html',
   'signup.html', 'dashboard.html', 'privacy.html', 'tobi.html', 'tobi-studio.html',
   'styles.css', 'script.js', 'favicon.svg', '1.png', '9.png', 'save-world-preview.png',
@@ -13,11 +13,11 @@ const allowedFiles = [
   'tobi.js', 'tobi.bundle.js', 'tobi.css', 'tobi-refresh.css',
   'tobi-assets/tobi.svg', 'tobi-assets/tobi-blink.svg', 'tobi-assets/tobi-jump.svg',
   'tobi-assets/original-background.jpg', 'vendor/three/three.module.min.js',
-  'vendor/three/LICENSE.txt', 'Dockerfile', '.dockerignore', 'DEPLOYMENT.md',
+  'vendor/three/LICENSE.txt', 'Dockerfile', '.dockerignore', 'render.yaml', '.env.example', 'DEPLOYMENT.md',
   'README.md', 'TOBI-SETUP.md', 'Open Aman.cmd', 'tools/start-aman.ps1',
 ];
-const textFile = /\.(?:js|html|css|svg|md|txt|cmd|ps1)$/i;
-const keyPattern = /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}/;
+const textFile = /\.(?:js|html|css|svg|md|txt|cmd|ps1|json|ya?ml)$/i;
+const keyPattern = /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}|\bpostgres(?:ql)?:\/\/[^\s/@]+:[^\s/@]+@|\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}/;
 
 function insideRoot(filename) {
   const relative = path.relative(root, filename);
@@ -31,7 +31,7 @@ async function loadPublicFile(name) {
     throw new Error(`Refusing a link or non-file in the deployment allowlist: ${name}`);
   }
   const content = await readFile(filename);
-  if (textFile.test(name) && keyPattern.test(content.toString('utf8'))) {
+  if ((textFile.test(name) || ['Dockerfile', '.dockerignore', '.env.example'].includes(name)) && keyPattern.test(content.toString('utf8'))) {
     throw new Error(`Possible API credential found in ${name}. Remove it before packaging; its value was not printed.`);
   }
   return { name, content, modified: stat.mtimeMs };
@@ -103,12 +103,17 @@ async function main() {
     }
   }
   const project = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-  // Generate a minimal runtime manifest; no development commands or dependencies ship.
+  // Generate a matching runtime manifest and lockfile without development packages.
   const manifest = {
     name: 'aman-digital-kindness', version: project.version, private: true,
     type: 'module', engines: { node: '>=24' }, scripts: { start: 'node server.js' },
+    dependencies: project.dependencies,
   };
   files.push({ name: 'package.json', content: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`) });
+  const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
+  lock.packages = Object.fromEntries(Object.entries(lock.packages).filter(([name, entry]) => name && !entry.dev));
+  lock.packages[''] = { name: manifest.name, version: manifest.version, engines: manifest.engines, dependencies: manifest.dependencies };
+  files.push({ name: 'package-lock.json', content: Buffer.from(`${JSON.stringify(lock, null, 2)}\n`) });
   if (args.includes('--list')) console.log(files.map(file => file.name).sort().join('\n'));
   const total = files.reduce((size, file) => size + file.content.length, 0);
   if (args.includes('--check') || args.includes('--list')) {

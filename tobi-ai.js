@@ -1,20 +1,21 @@
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { deriveSecret } from './server-secrets.js';
 
 const invalid = error => Object.assign(new Error(error), { status: 400 });
 const aad = Buffer.from('tobi-openai-credential-v1');
 
 // This module and the keyring are never part of the public-file allowlist.
-export async function createConnectionStore(db, dataDir, environmentKey, environmentModel) {
-  db.exec(`CREATE TABLE IF NOT EXISTS tobi_connection (
+export async function createConnectionStore(db, dataDir, environmentKey, environmentModel, masterSecret = '') {
+  await db.exec(`CREATE TABLE IF NOT EXISTS tobi_connection (
     id INTEGER PRIMARY KEY CHECK(id=1), source TEXT NOT NULL,
     encrypted_key TEXT, model TEXT, generation INTEGER NOT NULL DEFAULT 0,
     last_test TEXT
   )`);
-  db.prepare("INSERT OR IGNORE INTO tobi_connection(id,source) VALUES(1,'environment')").run();
+  await db.run("INSERT INTO tobi_connection(id,source) VALUES(1,'environment') ON CONFLICT(id) DO NOTHING");
   const keyringPath = path.join(dataDir, 'tobi-keyring.bin');
-  let keyring = await readFile(keyringPath).catch(error => {
+  let keyring = deriveSecret(masterSecret, 'keyring') || await readFile(keyringPath).catch(error => {
     if (error.code === 'ENOENT') return null;
     throw new Error('Could not open the private Tobi keyring.');
   });
@@ -25,7 +26,7 @@ export async function createConnectionStore(db, dataDir, environmentKey, environ
     writes = result.catch(() => {});
     return result;
   };
-  const row = () => db.prepare('SELECT * FROM tobi_connection WHERE id=1').get();
+  const row = () => db.get('SELECT * FROM tobi_connection WHERE id=1');
   async function ensureKeyring() {
     if (keyring) return keyring;
     const next = randomBytes(32);
@@ -50,8 +51,8 @@ export async function createConnectionStore(db, dataDir, environmentKey, environ
       return Buffer.concat([cipher.update(Buffer.from(value.data, 'base64')), cipher.final()]).toString('utf8');
     } catch { return ''; }
   }
-  function current() {
-    const saved = row();
+  async function current() {
+    const saved = await row();
     const apiKey = saved.source === 'studio' ? decrypt(saved.encrypted_key) : saved.source === 'environment' ? environmentKey : '';
     return { apiKey, source: apiKey ? saved.source : 'none', model: saved.model || environmentModel, generation: saved.generation, lastTest: apiKey && saved.last_test ? JSON.parse(saved.last_test) : null };
   }
@@ -62,11 +63,11 @@ export async function createConnectionStore(db, dataDir, environmentKey, environ
     const supplied = input.apiKey?.trim() || '';
     if (supplied && !/^sk-[A-Za-z0-9_-]{16,497}$/.test(supplied)) throw invalid('key_invalid');
     return enqueue(async () => {
-      const before = current();
+      const before = await current();
       if (!supplied && !before.apiKey) throw invalid('key_missing');
       const changed = (supplied && supplied !== before.apiKey) || input.model !== before.model || (supplied && before.source !== 'studio');
       if (!changed) return before;
-      const saved = row();
+      const saved = await row();
       let encrypted = saved.encrypted_key;
       let source = saved.source;
       if (supplied) {
@@ -78,19 +79,19 @@ export async function createConnectionStore(db, dataDir, environmentKey, environ
         encrypted = JSON.stringify({ version: 1, iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') });
         source = 'studio';
       }
-      db.prepare('UPDATE tobi_connection SET source=?,encrypted_key=?,model=?,generation=generation+1,last_test=NULL WHERE id=1').run(source, encrypted, input.model);
+      await db.run('UPDATE tobi_connection SET source=?,encrypted_key=?,model=?,generation=generation+1,last_test=NULL WHERE id=1', source, encrypted, input.model);
       return current();
     });
   }
   function remove() {
-    return enqueue(() => {
+    return enqueue(async () => {
       // A deliberate disconnect must not silently fall back to an old .env key.
-      db.prepare("UPDATE tobi_connection SET source='disconnected',encrypted_key=NULL,generation=generation+1,last_test=NULL WHERE id=1").run();
+      await db.run("UPDATE tobi_connection SET source='disconnected',encrypted_key=NULL,generation=generation+1,last_test=NULL WHERE id=1");
       return current();
     });
   }
-  function recordTest(generation, result) {
-    return db.prepare('UPDATE tobi_connection SET last_test=? WHERE id=1 AND generation=?').run(JSON.stringify({ ok: result.ok, reason: result.reason || null, at: new Date().toISOString() }), generation).changes > 0;
+  async function recordTest(generation, result) {
+    return (await db.run('UPDATE tobi_connection SET last_test=? WHERE id=1 AND generation=?', JSON.stringify({ ok: result.ok, reason: result.reason || null, at: new Date().toISOString() }), generation)).changes > 0;
   }
   return { current, save, remove, recordTest };
 }

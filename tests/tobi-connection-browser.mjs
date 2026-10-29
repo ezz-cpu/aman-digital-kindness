@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, mkdir, rm } from 'node:fs/promises';
@@ -19,7 +20,7 @@ const server = await createApp({ dataDir, tobiOptions: {
     return Response.json({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: content.max_output_tokens === 64 ? 'OK' : `Simulated AI reply ${calls.length}: I can help you learn and stay safe.` }] }] });
   },
 } });
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+await listenForTests(server);
 const base = `http://127.0.0.1:${server.address().port}`;
 const installedChrome = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const executablePath = process.env.CHROME_PATH || (existsSync(installedChrome) ? installedChrome : undefined);

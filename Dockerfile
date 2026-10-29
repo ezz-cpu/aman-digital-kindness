@@ -8,8 +8,10 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-# Browser bundles are built before packaging. The server has no npm dependencies.
-COPY --chown=node:node package.json server.js tobi-service.js tobi-ai.js tobi-public.js tobi-content.js ./
+# Browser bundles are built before packaging. Only PostgreSQL's driver ships.
+COPY --chown=node:node package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+COPY --chown=node:node server.js database.js server-secrets.js tobi-service.js tobi-ai.js tobi-public.js tobi-content.js ./
 COPY --chown=node:node index.html about.html resources.html interactive.html login.html signup.html dashboard.html privacy.html tobi.html tobi-studio.html ./
 COPY --chown=node:node styles.css script.js favicon.svg 1.png 9.png aman-experience.css aman-scene.js aman-scene.bundle.js tobi.js tobi.bundle.js tobi.css tobi-refresh.css ./
 COPY --chown=node:node save-world-preview.png ./

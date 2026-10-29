@@ -1,3 +1,4 @@
+import { listenForTests } from './helpers/http-server.mjs';
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
@@ -8,7 +9,7 @@ import {defaultConfig,findAnswer} from '../tobi-content.js';
 let dataDir,server,base,ownerCookie,visitorCookie,state,calls=[],unavailable=false;
 const fakeKey='test-only-server-secret';
 const options={apiKey:fakeKey,dailyLimit:3,aiFetch:async(url,request)=>{calls.push({url,request});if(unavailable)return new Response('{}',{status:503});return Response.json({status:'completed',output:[{type:'reasoning',summary:[]},{type:'message',content:[{type:'output_text',text:'A helpful simulated AI answer.'}]}]});}};
-async function start(){server=await createApp({dataDir,tobiOptions:options});await new Promise(r=>server.listen(0,'127.0.0.1',r));base=`http://127.0.0.1:${server.address().port}`;}
+async function start(){server=await createApp({dataDir,tobiOptions:options});await listenForTests(server);base=`http://127.0.0.1:${server.address().port}`;}
 async function request(route,{method='GET',data,cookie,origin}={}){const response=await fetch(base+route,{method,headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...(origin?{Origin:origin}:{})},...(data===undefined?{}:{body:JSON.stringify(data)})});return {response,status:response.status,body:await response.json()};}
 async function signup(email){const r=await request('/api/auth/signup',{method:'POST',data:{name:'Tobi Friend',email,password:'long test password phrase'}});assert.equal(r.status,201);return r.response.headers.get('set-cookie').split(';')[0];}
 before(async()=>{dataDir=await mkdtemp(path.join(tmpdir(),'aman-tobi-test-'));await start();});
