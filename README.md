@@ -2,6 +2,12 @@
 
 A complete Arabic / English cyberbullying awareness website with an animated interface, real accounts, a resource library, a learning challenge, and personal progress.
 
+## Public website
+
+Share **https://ezz-cpu.github.io/aman-digital-kindness/** to explore the guides, games, and Tobi's free notebook. The GitHub Pages version does not offer account sign-in or AI chat; those features work when the Node.js server is hosted. The public build identifies this clearly and never requests passwords or server APIs.
+
+Run `npm run build:browser` followed by `npm run build:pages` to generate the public assets in `release/pages/`. Publish that directory to the `codex/pages` branch. The build copies an explicit browser-file allowlist and marks its HTML for public play without a server.
+
 ## Run locally
 
 On this Windows computer, double-click **Open Aman.cmd** to start the website and open it in your browser. The launcher reuses an already running Aman server. Directly opening index.html also displays the 3D scene, but accounts and AI need the server.

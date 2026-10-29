@@ -6,6 +6,7 @@ let lang=readLocal('aman-language','ar'),config=structuredClone(defaultConfig),r
 let view='home',sound=false,best=0,messages=[],chatNotice='',pending=false,requestId=0,controller=null;
 let chatMode='auto',chatDraft='',companionMood=0,connection=null,connectionBusy=false,connectionMessage='',connectionError=false;
 const fileMode=location.protocol==='file:';
+const staticPreview=!!document.querySelector('meta[name="aman-static-site"]');
 let quiz={index:0,selected:null,correct:0,done:false,save:''},wordResult=null,riddleIndex=0,riddleResult='',editorTab='settings',selectedAnswer=0,selectedQuestion=0,studioMessage='';
 const t=(en,ar)=>lang==='ar'?ar:en;
 const canUseAI=()=>connected&&config.chatEnabled&&aiAvailable&&(aiAccess.ready??(aiAccess.audience==='public'||!!user));
@@ -14,16 +15,18 @@ function acceptAIConfig(result){
  aiAccess=result.aiAccess||{audience:'members',ready:aiAvailable&&!!user,reason:aiAvailable?'login_required':'disabled'};
 }
 async function refreshAIState(signal){
- if(fileMode){connected=false;return;}
+ if(fileMode||staticPreview){connected=false;return;}
  try{const result=await api('/api/tobi/config',{signal});acceptAIConfig(result);connected=true;}
  catch(error){if(error.name==='AbortError')throw error;connected=false;}
 }
 function unavailableAI(){
+ if(staticPreview)return t('AI chat is unavailable on this link. You can use Tobi’s notebook replies and all the games.','دردشة AI مش متاحة على الرابط ده. تقدر تستخدم ردود دفتر توبي وكل الألعاب.');
  if(fileMode)return t('Open Aman.cmd from the website folder, then open Tobi from the running site to use AI.','افتح Open Aman.cmd من فولدر الموقع، وبعدها افتح توبي من الموقع عشان تستخدم AI.');
  if(!connected)return t('The server is unavailable. Try AI again when the connection returns.','السيرفر مش متاح دلوقتي. جرّب زر AI تاني لما الاتصال يرجع.');
  return aiReason(aiAccess.reason||(!aiAvailable?'disabled':'login_required'));
 }
 function aiHelpLink(){
+ if(staticPreview)return '';
  if(fileMode)return ` <a href="http://127.0.0.1:3000/tobi.html#chat">${t('Open the running site','افتح الموقع لو شغّال')} ↗</a>`;
  if(aiAccess.reason==='login_required')return ` <a href="login.html?next=tobi.html">${t('Log in','سجّل الدخول')}</a>`;
  if(access.canEdit&&!canUseAI())return ` <a href="tobi-studio.html#ai">${t('Open AI settings','افتح إعدادات AI')}</a>`;
@@ -38,7 +41,7 @@ const activityInfo=()=>[
  {id:'riddles',icon:'▸',name:t('Movie Riddles','ألغاز الأفلام'),description:t('A few emojis. One movie. Can you work it out?','بضعة رموز وفيلم واحد. هل تستطيع تخمينه؟'),tag:t('Guess the story','خمّن القصة'),enabled:config.riddlesEnabled},
 ];
 async function api(url,options={}){
- if(fileMode)throw new Error('offline');
+ if(fileMode||staticPreview)throw new Error('offline');
  const response=await fetch(url,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...options.headers}});
  let data;try{data=await response.json();}catch(error){if(error.name==='AbortError')throw error;throw new Error('offline');}
  if(!response.ok)throw new Error(data.error||'server_error');return data;
@@ -51,6 +54,11 @@ function render(){
  const label=studio?t('Tobi Studio','استوديو توبي'):view==='home'?t('Mission home','الرئيسية'):activityInfo().find(a=>a.id===view)?.name;
  root.innerHTML=`${header()}<div class="workspace">${sidebar()}<main id="tobi-main" class="main-stage" tabindex="-1"><div class="stage-bar"><span class="breadcrumb">${t('TOBI / SAFE SPACE','توبي / مساحة آمنة')} <span>·</span> ${e(label||'')}</span><span class="status-pill"><i class="status-dot"></i>${canUseAI()?t('AI connected · ready to chat','AI متصل • جاهز للدردشة'):aiAccess.reason==='login_required'?t('AI available · sign in to use','AI متاح بعد تسجيل الدخول'):t('Notebook & games · ready','دفتر توبي والألعاب • جاهزين')}</span></div>${fileMode?`<div class="studio-notice warning local-file-notice"><strong>${t('You opened the file directly.','أنت فاتح الملف مباشرة.')}</strong> ${t('Free games work here. For accounts and AI, double-click Open Aman.cmd in the website folder, then open Tobi from the site.','الألعاب المجانية شغّالة هنا. للحسابات وAI، افتح Open Aman.cmd من فولدر الموقع بدبل كليك، وبعدها افتح توبي من الموقع.')} <a href="http://127.0.0.1:3000/${studio?'tobi-studio':'tobi'}.html">${t('Open the running site','افتح الموقع لو شغّال')} ↗</a></div>`:!connected?`<div class="studio-notice warning">${t('Server unavailable. Built-in play is ready; saving and AI are unavailable.','الخادم غير متاح. يمكنك اللعب بالإجابات المحفوظة، لكن الحفظ والذكاء الاصطناعي غير متاحين.')}</div>`:''}${studio?studioPage():({home:homePage,chat:chatPage,quest:questPage,words:wordsPage,riddles:riddlesPage}[view]||homePage)()}<p class="footnote">${t('Made for a kinder internet. Your original Tobi, now right here.','صُنع لإنترنت ألطف. توبي الأصلي أصبح هنا معك.')} <a href="privacy.html">${t('Privacy','الخصوصية')}</a></p></main></div>`;
  if(view==='chat'&&!studio){const log=document.querySelector('#chat-log');log.scrollTop=log.scrollHeight;}
+ if(staticPreview){
+  root.querySelectorAll('a[href]').forEach(link=>{if(/^(login|signup|dashboard|tobi-studio)\.html/.test(link.getAttribute('href')))link.remove();});
+  const notice=root.querySelector('.studio-notice.warning');
+  if(notice){notice.classList.remove('warning');notice.textContent=t('Notebook replies and games are ready. AI chat is unavailable on this link.','ردود دفتر توبي والألعاب جاهزة. دردشة AI مش متاحة على الرابط ده.');}
+ }
 }
 function homePage(){
  const moods=[t('Your friendly digital sidekick','صاحبك في كل مغامرة'),t('Hey! Ready to explore together?','أهلًا بيك! جاهز نكتشف حاجة جديدة؟'),t('A little kindness goes a long way.','كلمة حلوة منك ممكن تفرّح حد.')];
@@ -127,6 +135,7 @@ async function finishQuest(){
 function wordsPage(){return `${heading(t('WORDS HAVE POSSIBILITIES','الكلمات مليئة بالاحتمالات'),t('Find another way to say it.','اكتشف طريقة أخرى للتعبير.'),t('Explore synonyms and opposites in our English word bank.','اكتشف المرادفات والأضداد في بنك الكلمات الإنجليزية.'))}<section class="activity-panel"><h2>${t('Pick a word. Follow your curiosity.','اختر كلمة واتبع فضولك.')}</h2><form id="word-form" class="activity-form"><label for="word-input">${t('English word','كلمة إنجليزية')}<input id="word-input" maxlength="40" required placeholder="Try kind, brave, happy…" dir="ltr"></label><button class="primary">${t('Explore','اكتشف')} ↗</button></form><div class="word-chips">${words.map(w=>`<button data-word="${w[0]}" lang="en">${w[0]}</button>`).join('')}</div>${wordResult?typeof wordResult==='string'?`<p class="studio-notice warning" role="status">${e(wordResult)}</p>`:`<div class="word-result" role="status"><div><h3>${t('SYNONYMS · SIMILAR MEANING','مرادفات • معنى مشابه')}</h3><p dir="ltr" lang="en">${e(wordResult[1])}</p></div><div><h3>${t('ANTONYMS · OPPOSITE MEANING','أضداد • معنى معاكس')}</h3><p dir="ltr" lang="en">${e(wordResult[2])}</p></div></div>`:''}</section>`;}
 function riddlesPage(){const r=riddles[riddleIndex];return `${heading(t('LIGHTS. CAMERA. CURIOSITY.','أضواء وكاميرا وفضول'),t('Guess the movie.','خمّن الفيلم.'),t('Three little clues. One big story.','ثلاثة أدلة صغيرة وقصة كبيرة.'))}<section class="activity-panel"><div class="quiz-top"><strong>${t('Movie riddle','لغز الفيلم')} ${riddleIndex+1} / ${riddles.length}</strong><span>${t('Play with a friend','العب مع صديق')}</span></div><div class="riddle-emoji" role="img" aria-label="${t('Emoji movie clues','أدلة الفيلم بالرموز')}: ${r.clue}" dir="ltr">${r.clue}</div><form id="riddle-form" class="activity-form"><label for="riddle-input">${t('Your guess','تخمينك')}<input id="riddle-input" required maxlength="80" autocomplete="off" placeholder="${t('Name that movie…','ما اسم الفيلم؟')}"></label><button class="primary">${t('Check my guess','تحقق من تخميني')}</button></form><p class="riddle-reveal" role="status">${e(riddleResult)}</p><div class="button-row"><button class="secondary" data-action="reveal-riddle">${t('Reveal the answer','اكشف الإجابة')}</button><button class="secondary" data-action="next-riddle">${t('Next riddle','اللغز التالي')} →</button></div></section>`;}
 function studioPage(){
+ if(staticPreview)return `<section class="empty-state"><h1>${t('Play with Tobi','العب مع توبي')}</h1><p>${t('The owner’s studio is unavailable on this link. All the notebook activities are ready to explore.','استوديو المالك مش متاح على الرابط ده. أنشطة دفتر توبي كلها جاهزة للتجربة.')}</p><a class="primary" href="tobi.html">${t('Meet Tobi','قابل توبي')}</a></section>`;
  if(!connected)return `<section class="empty-state"><h1>${t('Start the Aman server first.','شغّل خادم أمان أولاً.')}</h1><p>${t('Tobi Studio needs the server to save your changes.','يحتاج استوديو توبي إلى الخادم لحفظ التغييرات.')}</p></section>`;
  if(!user)return `<section class="activity-panel studio-access"><span class="eyebrow">TOBI STUDIO</span><h1>${t('Your game. Your imagination.','لعبتك وخيالك.')}</h1><p>${t('Log in to manage Tobi’s answers, missions and settings. Only the site owner can make changes.','سجّل الدخول لإدارة إجابات توبي ومهامه وإعداداته. المالك فقط يستطيع إجراء التغييرات.')}</p><a class="primary" href="login.html?next=tobi-studio.html">${t('Log in to continue','سجّل الدخول للمتابعة')}</a></section>`;
  if(!access.canEdit)return `<section class="activity-panel studio-access"><span class="eyebrow">TOBI STUDIO</span><h1>${access.ownerConfigured?t('This is the owner’s studio.','هذا استوديو مالك الموقع.'):t('Make this your studio.','اجعل هذا استوديوك.')}</h1><p>${access.ownerConfigured?t('Sign in with the owner account to edit this game. Everyone can still play for free.','سجّل الدخول بحساب المالك لتعديل اللعبة. يستطيع الجميع اللعب مجاناً.'):t('One-time setup: copy the code from .data/tobi-owner-code.txt on the computer running this website. This connects the studio to your signed-in account.','إعداد لمرة واحدة: انسخ الرمز من ملف .data/tobi-owner-code.txt على الجهاز الذي يشغّل الموقع لربط الاستوديو بحسابك.')}</p>${!access.ownerConfigured?`<form id="claim-form"><label for="owner-code">${t('Owner setup code','رمز إعداد المالك')}</label><input id="owner-code" type="password" maxlength="100" required autocomplete="off"><button class="primary">${t('Connect my account','اربط حسابي')}</button></form>`:`<a class="secondary" href="tobi.html">${t('Back to Tobi','العودة إلى توبي')}</a>`}<p class="status-message error" role="status">${e(studioMessage)}</p></section>`;
@@ -284,7 +293,7 @@ root.addEventListener('change',event=>{
 });
 window.addEventListener('beforeunload',event=>{cancelChat();if(dirty){event.preventDefault();event.returnValue='';}});
 async function init(){
- if(fileMode){connected=false;best=Math.max(0,Math.min(100,Number(readLocal('tobi-guest-best','0'))||0));if(!studio&&activityInfo().some(a=>a.id===location.hash.slice(1)))view=location.hash.slice(1);render();return;}
+ if(fileMode||staticPreview){connected=false;best=Math.max(0,Math.min(100,Number(readLocal('tobi-guest-best','0'))||0));if(!studio&&activityInfo().some(a=>a.id===location.hash.slice(1)))view=location.hash.slice(1);render();return;}
  const results=await Promise.allSettled([api('/api/tobi/config'),api('/api/auth/session'),api('/api/tobi/access')]);
  if(results[0].status==='fulfilled')acceptAIConfig(results[0].value);else connected=false;
  if(results[1].status==='fulfilled')user=results[1].value.user;

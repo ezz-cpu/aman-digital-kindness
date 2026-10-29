@@ -11,11 +11,13 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "build:browser": "node tools/build-scene.mjs",
+    "build:pages": "node tools/build-pages.mjs",
     "test": "node --test tests/auth.test.js tests/tobi.test.js tests/tobi-connection.test.js tests/tobi-public.test.js",
     "test:tobi": "node tests/tobi-browser.mjs && node tests/tobi-cancel.mjs",
     "test:tobi-ai": "node tests/tobi-connection-browser.mjs",
     "test:tobi-public": "node tests/tobi-public-browser.mjs",
     "test:ui": "node tests/browser.mjs",
+    "test:pages": "node tests/pages.mjs",
     "test:a11y": "node tests/accessibility.mjs",
     "test:scene": "node tests/scene.mjs",
     "test:local": "node tests/local-open.mjs"
