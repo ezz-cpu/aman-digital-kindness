@@ -8,6 +8,8 @@ import { createTobi } from './tobi-service.js';
 import { clientAddress, parseTrustProxyHops } from './tobi-public.js';
 import { openDatabase } from './database.js';
 import { validateHostedSecrets } from './server-secrets.js';
+import { createRequestLimits } from './request-limits.js';
+import { publicFiles as browserFiles } from './public-files.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const scrypt = promisify(scryptCallback);
@@ -19,16 +21,16 @@ const checklistIds = ['privacy', 'password', 'report', 'trusted'];
 export async function createApp({ dataDir = process.env.DATA_DIR || path.join(root, '.data'), databaseUrl = process.env.DATABASE_URL || '', database, masterSecret = process.env.APP_SECRET || '', ownerCode = process.env.TOBI_OWNER_CODE || '', secureCookies = process.env.NODE_ENV === 'production', trustProxyHops = process.env.TRUST_PROXY_HOPS ?? 0, tobiOptions = {} } = {}) {
   const trustedHops = parseTrustProxyHops(trustProxyHops);
   if (databaseUrl || database?.kind === 'postgres') validateHostedSecrets(masterSecret, ownerCode);
-  if (process.env.RENDER && !databaseUrl && !database) throw new Error('Render hosting requires DATABASE_URL so accounts survive restarts.');
-  await mkdir(dataDir, { recursive: true });
+  if ((process.env.RENDER || process.env.VERCEL) && !databaseUrl && !database) throw new Error('Cloud hosting requires DATABASE_URL so accounts survive restarts.');
+  if (!databaseUrl && database?.kind !== 'postgres') await mkdir(dataDir, { recursive: true });
   const db = database || await openDatabase({ dataDir, databaseUrl });
   try {
-    await db.exec(`
+    await db.transaction(tx => tx.exec(`
       CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, password_hash TEXT NOT NULL, created_at BIGINT NOT NULL);
       CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at BIGINT NOT NULL);
       CREATE TABLE IF NOT EXISTS progress (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, saved TEXT NOT NULL DEFAULT '[]', checklist TEXT NOT NULL DEFAULT '[]', quiz INTEGER);
-    `);
-    const attempts = new Map();
+    `));
+    const requestLimits = await createRequestLimits({ db, masterSecret });
     const dummySalt = randomBytes(16).toString('hex');
     const dummyHash = await scrypt('constant-time-nonexistent-account', dummySalt, 64);
     const cookie = (token, age = sessionAge) => `aman_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${age}${secureCookies ? '; Secure' : ''}`;
@@ -64,10 +66,8 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ro
         return value;
       } catch { throw Object.assign(new Error('invalid_request'), { status: 400 }); }
     }
-    const publicFiles = new Set(['index.html', 'about.html', 'resources.html', 'interactive.html', 'login.html', 'signup.html', 'dashboard.html', 'privacy.html', 'styles.css', 'script.js', 'favicon.svg', '1.png', '9.png']);
-    for (const file of ['tobi.html','tobi-studio.html','tobi.js','tobi.css','tobi-content.js','tobi-assets/tobi.svg','tobi-assets/tobi-blink.svg','tobi-assets/tobi-jump.svg','tobi-assets/original-background.jpg']) publicFiles.add(file);
-    const handleTobi = await createTobi({db,dataDir,body,session,secureCookies,masterSecret,ownerCode,...tobiOptions});
-    for (const file of ['aman-experience.css', 'aman-scene.js', 'aman-scene.bundle.js', 'tobi.bundle.js', 'tobi-refresh.css', 'save-world-preview.png', 'vendor/three/three.module.min.js', 'vendor/three/LICENSE.txt']) publicFiles.add(file);
+    const publicFiles = new Set(browserFiles);
+    const handleTobi = await createTobi({db,dataDir,body,session,secureCookies,masterSecret,ownerCode,requestLimits,...tobiOptions});
     const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg':'image/jpeg' };
     const server = http.createServer(async (req, res) => {
       req.clientAddress = clientAddress(req, trustedHops);
@@ -81,7 +81,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ro
         if (url.pathname.startsWith('/api/')) {
           if (!['GET', 'POST', 'PUT'].includes(req.method)) return json(res, 405, { error: 'invalid_request' });
           if (req.method !== 'GET') {
-            const expected = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || `${secureCookies ? 'https' : 'http'}://${req.headers.host}`;
+            const expected = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : `${secureCookies ? 'https' : 'http'}://${req.headers.host}`);
             if ((req.headers.origin && req.headers.origin !== expected) || req.headers['sec-fetch-site'] === 'cross-site') return json(res, 403, { error: 'invalid_request' });
           }
           if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, service: 'aman' });
@@ -89,13 +89,9 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ro
           if (url.pathname === '/api/auth/session' && req.method === 'GET') return json(res, 200, { user: await session(req) });
           if (['/api/auth/signup', '/api/auth/login'].includes(url.pathname) && req.method === 'POST') {
             const input = await body(req);
-            const key = req.clientAddress;
             const now = Date.now();
-            for (const [ip, entry] of attempts) if (entry.reset < now) attempts.delete(ip);
-            const rate = attempts.get(key) || { count: 0, reset: now + 15 * 60 * 1000 };
-            rate.count++;
-            attempts.set(key, rate);
-            if (rate.count > 20) { res.setHeader('Retry-After', Math.ceil((rate.reset - now) / 1000)); return json(res, 429, { error: 'too_many_attempts' }); }
+            const rate = await requestLimits.consume('auth', req.clientAddress, 20, 15 * 60 * 1000);
+            if (!rate.allowed) { res.setHeader('Retry-After', rate.retryAfter); return json(res, 429, { error: 'too_many_attempts' }); }
             const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
             const password = typeof input.password === 'string' ? input.password : '';
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || !password || password.length > 128) return json(res, 400, { error: 'invalid_fields' });

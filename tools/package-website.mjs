@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Never recurse over the workspace: personal data and credentials are not deliverables.
 const allowedFiles = [
-  'server.js', 'database.js', 'server-secrets.js', 'tobi-service.js', 'tobi-ai.js', 'tobi-public.js', 'tobi-content.js',
+  'server.js', 'database.js', 'server-secrets.js', 'request-limits.js', 'public-files.js', 'tobi-service.js', 'tobi-ai.js', 'tobi-public.js', 'tobi-content.js',
   'index.html', 'about.html', 'resources.html', 'interactive.html', 'login.html',
   'signup.html', 'dashboard.html', 'privacy.html', 'tobi.html', 'tobi-studio.html',
   'styles.css', 'script.js', 'favicon.svg', '1.png', '9.png', 'save-world-preview.png',

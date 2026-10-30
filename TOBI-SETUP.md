@@ -15,7 +15,7 @@ Opening index.html directly now also renders the actual 3D scene. Opening tobi.h
 
 1. Sign in to your website account or create an account.
 2. Open Tobi Studio.
-3. For first-time setup on Render, copy the private `TOBI_OWNER_CODE` value from your service's **Environment** settings into the setup form. For local SQLite, use `.data/tobi-owner-code.txt` on the computer running the website.
+3. For first-time setup on Vercel, copy the private `TOBI_OWNER_CODE` value from your project's **Settings → Environment Variables** into the setup form. On Render, use your service's **Environment** settings. For local SQLite, use `.data/tobi-owner-code.txt` on the computer running the website.
 4. Your account now owns the Studio. The one-time code expires; only that owner account can edit Tobi or manage AI.
 
 Existing owners keep access. You can edit greetings, animation, enabled activities, notebook answers, and quiz questions in Arabic and English. Save changes, then reopen the game.
@@ -58,7 +58,7 @@ Home, Stop, and disabling AI cancel pending requests. There are no automatic pai
 
 ## Private data and deployment
 
-Studio credentials are encrypted with AES-256-GCM. On free Render/Neon hosting, the ciphertext lives in PostgreSQL and separate encryption and visitor-signing keys derive from the private `APP_SECRET` environment value. **Preserve the database and APP_SECRET together across deployments and backups.** Render generates the secret once; do not replace it when updating the code. No local server files are needed for accounts, settings, or visitor identities in this mode.
+Studio credentials are encrypted with AES-256-GCM. On Vercel/Neon or Render/Neon hosting, the ciphertext lives in PostgreSQL and separate encryption and visitor-signing keys derive from the private `APP_SECRET` environment value. **Preserve the database and APP_SECRET together across deployments and backups.** Set the secret once in the host's environment settings; do not replace it when updating the code. No local server files are needed for accounts, settings, or visitor identities in this mode.
 
 For local SQLite, the database is `.data/aman.sqlite`, the encryption key is `.data/tobi-keyring.bin`, and the visitor-signing secret is `.data/tobi-visitor-secret.bin`. **Back up the entire private data directory together.** These files, hosting secrets, and server implementation are excluded from public serving. Owner-only APIs return connection status, never saved key text.
 
@@ -66,7 +66,7 @@ Existing `OPENAI_API_KEY` and `OPENAI_MODEL` environment configuration remains s
 
 Settings, owner identity, scores, request counters, and connection-test status are stored on the server. Public AI uses an essential signed HttpOnly visitor cookie and HMAC network counters; raw IP addresses are not stored in Tobi's usage tables. Conversation text stays in the current browser page and is not stored in the app database. When AI is used, recent conversation text is sent to OpenAI. Requests use `store: false`; this does not replace OpenAI’s own data-handling policies.
 
-For public hosting, follow the Arabic [deployment guide](DEPLOYMENT.md) for the free Render/Neon setup, HTTPS, persistent data, one server instance, and trusted-proxy configuration. It also includes Docker and clean ZIP packaging. A fresh database starts without local accounts or credentials; claim the owner account using the hosted environment code (or the private local file for SQLite), then connect your key.
+For public hosting without a payment card, follow the Arabic [deployment guide](DEPLOYMENT.md) for Vercel Hobby and Neon Free. PostgreSQL shares request limits and AI concurrency across function instances. The guide also covers Render, Docker, trusted proxies, and clean ZIP packaging. SQLite still requires a persistent disk and one server instance. A fresh database starts without local accounts or credentials; claim the owner account using the hosted environment code (or the private local file for SQLite), then connect your key.
 
 The integration follows [official OpenAI text-generation documentation](https://developers.openai.com/api/docs/guides/text) and [API key storage guidance](https://developers.openai.com/api/docs/guides/production-best-practices).
 

@@ -24,12 +24,12 @@ export function validateConfig(c){
  return c;
 }
 
-export async function createTobi({db,dataDir,body,session,secureCookies=false,masterSecret='',ownerCode='',apiKey=process.env.OPENAI_API_KEY||'',model=process.env.OPENAI_MODEL||'gpt-5.6-luna',aiFetch=fetch,dailyLimit=50,aiTimeoutMs=15000}){
- await db.exec(`CREATE TABLE IF NOT EXISTS tobi_config (id INTEGER PRIMARY KEY CHECK(id=1), document TEXT NOT NULL, revision INTEGER NOT NULL);
+export async function createTobi({db,dataDir,body,session,requestLimits,secureCookies=false,masterSecret='',ownerCode='',apiKey=process.env.OPENAI_API_KEY||'',model=process.env.OPENAI_MODEL||'gpt-5.6-luna',aiFetch=fetch,dailyLimit=50,aiTimeoutMs=15000}){
+ await db.transaction(tx=>tx.exec(`CREATE TABLE IF NOT EXISTS tobi_config (id INTEGER PRIMARY KEY CHECK(id=1), document TEXT NOT NULL, revision INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS tobi_owner (id INTEGER PRIMARY KEY CHECK(id=1), user_id TEXT NOT NULL REFERENCES users(id));
  CREATE TABLE IF NOT EXISTS tobi_setup (id INTEGER PRIMARY KEY CHECK(id=1), token_hash TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS tobi_progress (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, best INTEGER NOT NULL DEFAULT 0, rounds INTEGER NOT NULL DEFAULT 0);
- CREATE TABLE IF NOT EXISTS tobi_usage (day TEXT NOT NULL, user_id TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(day,user_id));`);
+ CREATE TABLE IF NOT EXISTS tobi_usage (day TEXT NOT NULL, user_id TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(day,user_id));`));
  await db.run('INSERT INTO tobi_config VALUES (1,?,1) ON CONFLICT(id) DO NOTHING',JSON.stringify(defaultConfig));
  const connectionStore = await createConnectionStore(db, dataDir, apiKey, model, masterSecret);
  const publicAccess = await createPublicAccessStore({db,dataDir,dailyLimit,secureCookies,masterSecret});
@@ -43,8 +43,8 @@ export async function createTobi({db,dataDir,body,session,secureCookies=false,ma
    await tx.run('INSERT INTO tobi_setup VALUES (1,?)',digest(code).toString('hex'));
   }
  });
- const claimAttempts=new Map(),chatAttempts=new Map(),connectionAttempts=new Map(),active=new Map();
- const rate=(map,key,max)=>{const now=Date.now();for(const [k,v] of map)if(v.until<now)map.delete(k);const v=map.get(key)||{n:0,until:now+60000};v.n++;map.set(key,v);return v.n<=max;};
+ const active=new Map();
+ const rate=async(scope,key,max)=>(await requestLimits.consume(scope,key,max,60000)).allowed;
  const fallback=lang=>lang==='ar'?'مش عندي إجابة محفوظة عن ده لسه. نقدر نتكلم عن التنمّر أو الخصوصية أو حماية حسابك أو مساعدة صاحبك.':'I don’t have a notebook answer for that yet. Try asking about bullying, passwords, privacy, or helping a friend.';
  async function connectionStatus(userId) {
   const [current,policy,state,usage]=await Promise.all([connectionStore.current(),publicAccess.read(),read(),publicAccess.usage(userId)]);
@@ -60,7 +60,10 @@ export async function createTobi({db,dataDir,body,session,secureCookies=false,ma
   const timeout=setTimeout(()=>controller.abort(),aiTimeoutMs);
   const cancel=()=>{if(!res.writableEnded)controller.abort();};
   res.on('close',cancel);
+  let lease;
   try {
+   lease=await requestLimits.acquire('tobi-ai',visitorId,3,Math.max(60000,aiTimeoutMs+10000));
+   if(!lease)return {ok:false,reason:'busy'};
    const limitReason=await publicAccess.reserve(visitorId,publicAccess.network(req));
    if(limitReason)return {ok:false,reason:limitReason};
    const [latest,latestPolicy,latestConnection]=await Promise.all([read(),publicAccess.read(),connectionStore.current()]);
@@ -68,11 +71,18 @@ export async function createTobi({db,dataDir,body,session,secureCookies=false,ma
    if(!testing&&(!latest.config.openAIEnabled||!latest.config.chatEnabled))return {ok:false,reason:'free_mode'};
    if(!testing&&latestPolicy.audience==='members'&&!user)return {ok:false,reason:'login_required'};
    if(controller.signal.aborted)return {ok:false,reason:'request_timeout'};
-   return await requestTobiAI({connection,aiFetch,signal:controller.signal,language,message,history,testing});
+   const result=await requestTobiAI({connection,aiFetch,signal:controller.signal,language,message,history,testing});
+   if(!result.ok)return result;
+   const [after,afterPolicy,afterConnection]=await Promise.all([read(),publicAccess.read(),connectionStore.current()]);
+   if(afterConnection.generation!==connection.generation||afterConnection.apiKey!==connection.apiKey)return {ok:false,reason:'settings_changed'};
+   if(!testing&&(!after.config.openAIEnabled||!after.config.chatEnabled))return {ok:false,reason:'free_mode'};
+   if(!testing&&afterPolicy.audience==='members'&&!user)return {ok:false,reason:'login_required'};
+   return result;
   } finally {
    clearTimeout(timeout);
    res.off('close',cancel);
    active.delete(visitorId);
+   await requestLimits.release(lease).catch(()=>console.error('An AI request slot could not be released.'));
   }
  }
  return async function handle(req,res,url,json){
@@ -102,7 +112,7 @@ export async function createTobi({db,dataDir,body,session,secureCookies=false,ma
   if(url.pathname==='/api/tobi/claim'&&req.method==='POST'){
    if(!user)return send(401,{error:'unauthorized'});
    if(await owner())return send(409,{error:'owner_already_set'});
-   if(!rate(claimAttempts,req.clientAddress,5))return send(429,{error:'too_many_attempts'});
+   if(!await rate('tobi-claim',req.clientAddress,5))return send(429,{error:'too_many_attempts'});
    const input=await body(req);
    const claim=await db.transaction(async tx=>{
     if(await tx.get('SELECT user_id FROM tobi_owner WHERE id=1'))return {status:409,error:'owner_already_set'};
@@ -140,7 +150,7 @@ export async function createTobi({db,dataDir,body,session,secureCookies=false,ma
    }
    if(url.pathname==='/api/tobi/connection/test'&&req.method==='POST'){
     await body(req);
-    if(!rate(connectionAttempts,user.id,5))return send(429,{error:'too_many_attempts'});
+    if(!await rate('tobi-connection',user.id,5))return send(429,{error:'too_many_attempts'});
     const connection=await connectionStore.current();
     if(!connection.apiKey)return send(200,{ok:false,reason:'key_missing',connection:await connectionStatus(user.id)});
     const result=await performAI({user,req,res,connection,language:'en',message:'Reply only with OK.',testing:true});
@@ -174,7 +184,7 @@ export async function createTobi({db,dataDir,body,session,secureCookies=false,ma
    return send(200,await db.get('SELECT best,rounds FROM tobi_progress WHERE user_id=?',user.id));
   }
   if(url.pathname==='/api/tobi/chat'&&req.method==='POST'){
-   if(!rate(chatAttempts,req.clientAddress,30))return send(429,{error:'too_many_attempts'});
+   if(!await rate('tobi-chat',req.clientAddress,30))return send(429,{error:'too_many_attempts'});
    const input=await body(req,24576),lang=input.language==='ar'?'ar':'en';
    if(!text(input.message,500)||!['en','ar'].includes(input.language)||(input.mode!==undefined&&!['auto','ai'].includes(input.mode)))throw invalid();
    const history=input.history??[];

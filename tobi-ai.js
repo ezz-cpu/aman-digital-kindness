@@ -8,11 +8,11 @@ const aad = Buffer.from('tobi-openai-credential-v1');
 
 // This module and the keyring are never part of the public-file allowlist.
 export async function createConnectionStore(db, dataDir, environmentKey, environmentModel, masterSecret = '') {
-  await db.exec(`CREATE TABLE IF NOT EXISTS tobi_connection (
+  await db.transaction(tx => tx.exec(`CREATE TABLE IF NOT EXISTS tobi_connection (
     id INTEGER PRIMARY KEY CHECK(id=1), source TEXT NOT NULL,
     encrypted_key TEXT, model TEXT, generation INTEGER NOT NULL DEFAULT 0,
     last_test TEXT
-  )`);
+  )`));
   await db.run("INSERT INTO tobi_connection(id,source) VALUES(1,'environment') ON CONFLICT(id) DO NOTHING");
   const keyringPath = path.join(dataDir, 'tobi-keyring.bin');
   let keyring = deriveSecret(masterSecret, 'keyring') || await readFile(keyringPath).catch(error => {

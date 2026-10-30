@@ -51,8 +51,8 @@ export function clientAddress(req, trustedHops = 0) {
 
 export async function createPublicAccessStore({ db, dataDir, dailyLimit, secureCookies, masterSecret = '' }) {
   const defaults = validatePolicy({ audience: 'public', siteDailyLimit: dailyLimit, visitorDailyLimit: 10, networkDailyLimit: 100 });
-  await db.exec(`CREATE TABLE IF NOT EXISTS tobi_policy (id INTEGER PRIMARY KEY CHECK(id=1), document TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS tobi_network_usage (day TEXT NOT NULL, network_id TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(day,network_id));`);
+  await db.transaction(tx => tx.exec(`CREATE TABLE IF NOT EXISTS tobi_policy (id INTEGER PRIMARY KEY CHECK(id=1), document TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS tobi_network_usage (day TEXT NOT NULL, network_id TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(day,network_id));`));
   await db.run('INSERT INTO tobi_policy VALUES(1,?) ON CONFLICT(id) DO NOTHING', JSON.stringify(defaults));
   const secretPath = path.join(dataDir, 'tobi-visitor-secret.bin');
   let secret = deriveSecret(masterSecret, 'visitors');

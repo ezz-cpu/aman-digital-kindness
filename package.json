@@ -5,14 +5,15 @@
   "type": "module",
   "description": "A bilingual digital safety and cyberbullying awareness website.",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22.13 <25"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "build:browser": "node tools/build-scene.mjs",
     "build:pages": "node tools/build-pages.mjs",
-    "test": "node --test tests/auth.test.js tests/deployment.test.js tests/postgres.test.js tests/tobi.test.js tests/tobi-connection.test.js tests/tobi-public.test.js",
+    "build:vercel": "npm run build:browser && node tools/build-vercel.mjs",
+    "test": "node --test tests/auth.test.js tests/deployment.test.js tests/postgres.test.js tests/serverless.test.js tests/tobi.test.js tests/tobi-connection.test.js tests/tobi-public.test.js",
     "test:tobi": "node tests/tobi-browser.mjs && node tests/tobi-cancel.mjs",
     "test:tobi-ai": "node tests/tobi-connection-browser.mjs",
     "test:tobi-public": "node tests/tobi-public-browser.mjs",
@@ -23,6 +24,7 @@
     "test:local": "node tests/local-open.mjs"
   },
   "dependencies": {
+    "@vercel/functions": "3.6.1",
     "pg": "^8.23.1"
   },
   "devDependencies": {

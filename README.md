@@ -4,11 +4,15 @@ A complete Arabic / English cyberbullying awareness website with an animated int
 
 ## Public website
 
-The full site supports **free Render hosting with a Neon Free PostgreSQL database**, including sign-up, login, saved progress, and Tobi Studio. [Follow the setup guide](DEPLOYMENT.md), then [deploy the free service](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fezz-cpu%2Faman-digital-kindness). The blueprint creates no paid disk or Render database. Hosting has free-tier limits and can take about a minute to wake after 15 minutes idle; OpenAI usage is separate. These files prepare deployment; they do not create a live server automatically.
+The full site supports **Vercel Hobby with a Neon Free PostgreSQL database**, including sign-up, login, saved progress, and Tobi Studio. [Follow the setup guide](DEPLOYMENT.md). This is the deployment path for free personal hosting without a payment card. Both providers have free usage limits; OpenAI usage is separate. These files prepare deployment; they do not create a live server automatically.
+
+Render Free is also supported by `render.yaml`, but Render required card verification for this account even with its $0/month service selected. Use Vercel when a card is not an option.
 
 The existing **https://ezz-cpu.github.io/aman-digital-kindness/** link offers the guides, games, and Tobi's free notebook. After deploying the full server, share its HTTPS link for accounts and AI. GitHub Pages cannot run the account server; its public build identifies this clearly and never requests passwords or server APIs.
 
 Run `npm run build:browser` followed by `npm run build:pages` to generate the public assets in `release/pages/`. Publish that directory to the `codex/pages` branch. The build copies an explicit browser-file allowlist and marks its HTML for public play without a server.
+
+Vercel instead runs `npm run build:vercel`: it builds the browser bundles and copies only the public allowlist to `release/vercel/`, retaining the real login pages. `/api/*` is routed to one private Node.js function. Deployment settings and server modules are never copied to the public directory. Configure production database credentials and secrets in Vercel, and select its Hobby plan.
 
 ## Run locally
 
@@ -60,12 +64,12 @@ Environment variables:
 | `APP_SECRET` | unset | Required with PostgreSQL; stable private value of at least 32 characters |
 | `TOBI_OWNER_CODE` | unset | Required with PostgreSQL; private one-time studio setup code, 32–100 characters |
 | `NODE_ENV` | unset | Set to `production` behind HTTPS to enable Secure cookies |
-| `APP_ORIGIN` | `RENDER_EXTERNAL_URL`, then the Host header | Exact public origin, such as `https://aman.example`, when behind a proxy |
+| `APP_ORIGIN` | `RENDER_EXTERNAL_URL`, then `https://VERCEL_PROJECT_PRODUCTION_URL`, then the Host header | Exact public origin, such as `https://aman.example`, when behind a proxy |
 | `TRUST_PROXY_HOPS` | `0` | Number of actual trusted proxy hops, from 0 to 10; leave 0 unless the deployment topology is verified |
 
-For public deployment, follow the Arabic [deployment guide](DEPLOYMENT.md). Use HTTPS and `NODE_ENV=production`. The Render blueprint uses external PostgreSQL and refuses to start without its connection settings and durable secrets. On other hosts, the Dockerfile runs Node 24 as a nonroot user and installs runtime dependencies; it requires prebuilt browser bundles. Local SQLite needs persistent `/data`. `GET /api/health` reports server readiness. Run one server instance only.
+For public deployment, follow the Arabic [deployment guide](DEPLOYMENT.md). Use HTTPS and `NODE_ENV=production`. Vercel and Render require external PostgreSQL and durable secrets. PostgreSQL startup does not write to the application's filesystem. On other hosts, the Dockerfile runs Node 24 as a nonroot user and installs runtime dependencies; it requires prebuilt browser bundles. Local SQLite needs persistent `/data` and one server instance. `GET /api/health` reports server readiness.
 
-Daily AI quotas are persisted in the selected database and reserved transactionally before provider requests. Short request-rate limits and the concurrency cap live in the server process. Configure `TRUST_PROXY_HOPS` only for the actual trusted topology and block direct access to the backend; otherwise forwarded client headers must not be trusted. A reverse proxy should also enforce client rate limits.
+Daily AI quotas and active request leases are reserved transactionally in the database. PostgreSQL instances also share login, owner-claim, chat, and connection-test rate limits using `APP_SECRET` to hash their identifiers. This keeps limits effective across Vercel cold starts and concurrent instances. Expiring leases recover interrupted AI requests; only three provider requests can run at once. Local SQLite's short rate windows reset with the process. Vercel's adapter trusts the single client IP header that Vercel overwrites. For other hosts, configure `TRUST_PROXY_HOPS` only for the actual trusted topology and block direct access to the backend.
 
 To create a clean deployment ZIP after rebuilding, run `node tools/package-website.mjs --check` and then `node tools/package-website.mjs`. The archive contains an explicit runtime allowlist and matching runtime package/lock files. It excludes `.env`, `.data`, installed dependencies, tests, and original game projects. Run `npm ci --omit=dev` in the extracted folder for PostgreSQL hosting; local SQLite can run without it. The archive does not contain your accounts or secrets; set them up privately on the host. Packaging does not publish the site.
 
@@ -84,6 +88,6 @@ npm run test:tobi-public
 npm run test:local
 ```
 
-The UI test uses installed Chrome on Windows. Set `CHROME_PATH` for a different executable, or run `npx playwright install chromium` to use Playwright's browser. Account and UI tests create temporary databases and remove only their own data afterward. PostgreSQL tests run the production adapter against PGlite's PostgreSQL engine, including concurrent signup/owner claims, encrypted credentials, quota transactions, and restarts with an empty application directory; they do not require cloud credentials. UI screenshots are written to `test-results/`. Run `npm start` before `npm run test:a11y`; the read-only accessibility check audits public pages in both languages on port 3000. API connection tests use simulated provider replies, never real API keys.
+The UI test uses installed Chrome on Windows. Set `CHROME_PATH` for a different executable, or run `npx playwright install chromium` to use Playwright's browser. Account and UI tests create temporary databases and remove only their own data afterward. PostgreSQL and serverless tests run the production adapter against PGlite's PostgreSQL engine, including concurrent signup/owner claims, encrypted credentials, quota transactions, shared login limits, cross-instance AI concurrency, and startup without a writable application directory; they do not require cloud credentials. UI screenshots are written to `test-results/`. Run `npm start` before `npm run test:a11y`; the read-only accessibility check audits public pages in both languages on port 3000. API connection tests use simulated provider replies, never real API keys.
 
 After editing `aman-scene.js`, `tobi.js`, or `tobi-content.js`, run `npm run build:browser` to regenerate the classic browser bundles used by both direct-file and HTTP opening. Stylesheets do not need rebuilding.

@@ -67,6 +67,10 @@ export async function openDatabase({ dataDir, databaseUrl = '' }) {
   if (databaseUrl) {
     const { Pool } = await import('pg');
     const pool = new Pool(postgresOptions(databaseUrl));
+    if (process.env.VERCEL) {
+      const { attachDatabasePool } = await import('@vercel/functions');
+      attachDatabasePool(pool);
+    }
     // Never log connection strings or provider errors that might contain credentials.
     pool.on('error', () => console.error('The account database connection was interrupted.'));
     return createPostgresDatabase(pool);
