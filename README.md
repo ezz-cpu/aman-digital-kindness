@@ -4,11 +4,13 @@ A complete Arabic / English cyberbullying awareness website with an animated int
 
 ## Public website
 
-The full site supports **Vercel Hobby with a Neon Free PostgreSQL database**, including sign-up, login, saved progress, and Tobi Studio. [Follow the setup guide](DEPLOYMENT.md). This is the deployment path for free personal hosting without a payment card. Both providers have free usage limits; OpenAI usage is separate. These files prepare deployment; they do not create a live server automatically.
+The full website is live at **[aman-digital-kindness.vercel.app](https://aman-digital-kindness.vercel.app/)**. Share this link for sign-up, login, saved progress, and Tobi's free notebook and games.
+
+It runs on **Vercel Hobby with a Neon Free PostgreSQL database**, without a payment card. Both providers have free usage limits. Paid AI is disabled; connecting OpenAI is optional and has separate usage charges. [Deployment and recovery instructions](DEPLOYMENT.md).
 
 Render Free is also supported by `render.yaml`, but Render required card verification for this account even with its $0/month service selected. Use Vercel when a card is not an option.
 
-The existing **https://ezz-cpu.github.io/aman-digital-kindness/** link offers the guides, games, and Tobi's free notebook. After deploying the full server, share its HTTPS link for accounts and AI. GitHub Pages cannot run the account server; its public build identifies this clearly and never requests passwords or server APIs.
+The existing **[GitHub Pages edition](https://ezz-cpu.github.io/aman-digital-kindness/)** offers the guides, games, and Tobi's free notebook. Use the Vercel link above for accounts and saved progress. GitHub Pages cannot run the account server; its public build identifies this clearly and never requests passwords or server APIs.
 
 Run `npm run build:browser` followed by `npm run build:pages` to generate the public assets in `release/pages/`. Publish that directory to the `codex/pages` branch. The build copies an explicit browser-file allowlist and marks its HTML for public play without a server.
 
@@ -51,7 +53,7 @@ Open **http://127.0.0.1:3000**. The website needs this server for accounts and s
 
 With no `DATABASE_URL`, account and progress data live in `.data/aman.sqlite`. Keep `.data/` private and persistent. With `DATABASE_URL`, all account, session, progress, owner, Tobi configuration, encrypted credential, and daily quota tables live in PostgreSQL. This mode survives replacement of the web server's entire local filesystem. Local accounts are not automatically copied into a new hosted database.
 
-For local SQLite, preserve the entire data directory, including `.data/tobi-keyring.bin` and `.data/tobi-visitor-secret.bin`. PostgreSQL deployments instead require a stable private `APP_SECRET` in the hosting environment; it derives separate encryption and visitor-signing keys and must be backed up alongside database backups. `TOBI_OWNER_CODE` allows the first owner to claim the studio once. Render generates both secrets once. Chat text is not saved by the app. Public AI uses a signed essential visitor cookie and HMAC network counters.
+For local SQLite, preserve the entire data directory, including `.data/tobi-keyring.bin` and `.data/tobi-visitor-secret.bin`. PostgreSQL deployments instead require a stable private `APP_SECRET` in the hosting environment; it derives separate encryption and visitor-signing keys and must be backed up alongside database backups. `TOBI_OWNER_CODE` allows the first owner to claim the studio once. The live Vercel deployment stores credentials as Production secrets; these cannot be revealed after saving. A private recovery copy is kept on the setup computer in `.env.vercel.production.local`, excluded from Git and public builds. Preserve it securely and keep the same values on redeployment. Chat text is not saved by the app. Public AI uses a signed essential visitor cookie and HMAC network counters.
 
 Environment variables:
 

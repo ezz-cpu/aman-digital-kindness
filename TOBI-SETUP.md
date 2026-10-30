@@ -2,6 +2,8 @@
 
 ## Open the website
 
+The public website is **[aman-digital-kindness.vercel.app](https://aman-digital-kindness.vercel.app/)**. Open [Tobi's free notebook and games](https://aman-digital-kindness.vercel.app/tobi.html) there. Paid AI is currently disabled.
+
 Double-click **Open Aman.cmd** in the website folder. It starts the Node.js server quietly if needed and opens http://127.0.0.1:3000. Node.js 22.13 or newer is required; Node 24 is recommended.
 
 - Game: http://127.0.0.1:3000/tobi.html
@@ -15,7 +17,7 @@ Opening index.html directly now also renders the actual 3D scene. Opening tobi.h
 
 1. Sign in to your website account or create an account.
 2. Open Tobi Studio.
-3. For first-time setup on Vercel, copy the private `TOBI_OWNER_CODE` value from your project's **Settings → Environment Variables** into the setup form. On Render, use your service's **Environment** settings. For local SQLite, use `.data/tobi-owner-code.txt` on the computer running the website.
+3. For first-time setup on Vercel, copy `TOBI_OWNER_CODE` from your private deployment backup into the setup form yourself. Values stored as Vercel **Secret** variables cannot be revealed after saving. The current deployment's recovery copy is `.env.vercel.production.local` on the setup computer; it is excluded from Git and public builds. Keep it private. On Render, use your service's **Environment** settings. For local SQLite, use `.data/tobi-owner-code.txt` on the computer running the website.
 4. Your account now owns the Studio. The one-time code expires; only that owner account can edit Tobi or manage AI.
 
 Existing owners keep access. You can edit greetings, animation, enabled activities, notebook answers, and quiz questions in Arabic and English. Save changes, then reopen the game.
