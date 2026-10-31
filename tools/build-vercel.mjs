@@ -24,7 +24,7 @@ for (const name of publicFiles) {
   const stat = await lstat(source);
   if (!stat.isFile() || stat.isSymbolicLink() || !inside(await realpath(source))) throw new Error(`Unsafe browser asset: ${name}`);
   const bytes = await readFile(source);
-  if (/\.(html|css|js|svg|txt)$/.test(name) && secretPattern.test(bytes.toString('utf8'))) throw new Error(`Possible secret in browser asset: ${name}`);
+  if (/\.(html|css|js|svg|txt|xml)$/.test(name) && secretPattern.test(bytes.toString('utf8'))) throw new Error(`Possible secret in browser asset: ${name}`);
   const target = path.join(output, name);
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, bytes);

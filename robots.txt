@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://aman-digital-kindness.vercel.app/sitemap.xml

@@ -13,7 +13,7 @@
     "build:browser": "node tools/build-scene.mjs",
     "build:pages": "node tools/build-pages.mjs",
     "build:vercel": "npm run build:browser && node tools/build-vercel.mjs",
-    "test": "node --test tests/auth.test.js tests/deployment.test.js tests/postgres.test.js tests/serverless.test.js tests/tobi.test.js tests/tobi-connection.test.js tests/tobi-public.test.js",
+    "test": "node --test tests/auth.test.js tests/deployment.test.js tests/postgres.test.js tests/serverless.test.js tests/tobi.test.js tests/tobi-connection.test.js tests/tobi-public.test.js tests/seo.test.js",
     "test:tobi": "node tests/tobi-browser.mjs && node tests/tobi-cancel.mjs",
     "test:tobi-ai": "node tests/tobi-connection-browser.mjs",
     "test:tobi-public": "node tests/tobi-public-browser.mjs",

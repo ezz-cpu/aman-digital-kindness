@@ -9,6 +9,7 @@ const allowedFiles = [
   'index.html', 'about.html', 'resources.html', 'interactive.html', 'login.html',
   'signup.html', 'dashboard.html', 'privacy.html', 'tobi.html', 'tobi-studio.html',
   'styles.css', 'script.js', 'favicon.svg', '1.png', '9.png', 'save-world-preview.png',
+  'robots.txt', 'sitemap.xml', 'aman-social-preview.png',
   'aman-experience.css', 'aman-scene.js', 'aman-scene.bundle.js',
   'tobi.js', 'tobi.bundle.js', 'tobi.css', 'tobi-refresh.css',
   'tobi-assets/tobi.svg', 'tobi-assets/tobi-blink.svg', 'tobi-assets/tobi-jump.svg',
@@ -16,7 +17,7 @@ const allowedFiles = [
   'vendor/three/LICENSE.txt', 'Dockerfile', '.dockerignore', 'render.yaml', '.env.example', 'DEPLOYMENT.md',
   'README.md', 'TOBI-SETUP.md', 'Open Aman.cmd', 'tools/start-aman.ps1',
 ];
-const textFile = /\.(?:js|html|css|svg|md|txt|cmd|ps1|json|ya?ml)$/i;
+const textFile = /\.(?:js|html|css|svg|md|txt|xml|cmd|ps1|json|ya?ml)$/i;
 const keyPattern = /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}|\bpostgres(?:ql)?:\/\/[^\s/@]+:[^\s/@]+@|\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}/;
 
 function insideRoot(filename) {

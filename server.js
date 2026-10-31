@@ -68,7 +68,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ro
     }
     const publicFiles = new Set(browserFiles);
     const handleTobi = await createTobi({db,dataDir,body,session,secureCookies,masterSecret,ownerCode,requestLimits,...tobiOptions});
-    const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg':'image/jpeg' };
+    const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg':'image/jpeg', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8' };
     const server = http.createServer(async (req, res) => {
       req.clientAddress = clientAddress(req, trustedHops);
       res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -79,6 +79,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ro
       try {
         const url = new URL(req.url, 'http://localhost');
         if (url.pathname.startsWith('/api/')) {
+          res.setHeader('X-Robots-Tag', 'noindex');
           if (!['GET', 'POST', 'PUT'].includes(req.method)) return json(res, 405, { error: 'invalid_request' });
           if (req.method !== 'GET') {
             const expected = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : `${secureCookies ? 'https' : 'http'}://${req.headers.host}`);

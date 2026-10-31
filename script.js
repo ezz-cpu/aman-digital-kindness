@@ -224,7 +224,8 @@ function render() {
   document.documentElement.lang = language;
   document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   const names = { home: t('مساحتك الرقمية الآمنة', 'A kinder digital world'), about: t('افهم التنمر', 'Understand bullying'), resources: t('الموارد', 'Resources'), interactive: t('تعلّم وتفاعل', 'Learn & play'), login: t('تسجيل الدخول', 'Log in'), signup: t('إنشاء حساب', 'Sign up'), dashboard: t('مساحتي', 'My space'), privacy: t('الخصوصية', 'Privacy') };
-  document.title = `${t('أمان', 'Aman')} — ${names[page]}`;
+  const searchTitle = $('meta[property="og:title"]')?.content;
+  document.title = language === 'ar' && searchTitle ? searchTitle : `${t('أمان', 'Aman')} — ${names[page]}`;
   const pages = { home, about, resources: resourcesPage, interactive, login: () => auth(false), signup: () => auth(true), dashboard, privacy };
   $('#app').innerHTML = `${header()}<main id="main" tabindex="-1">${filePreview ? localOpenNotice() : ''}${(pages[page] || home)()}</main>${footer()}${supportDialog()}<div class="toast" id="toast" role="status" aria-live="polite"></div>`;
   if (page === 'resources') updateResourceResults();

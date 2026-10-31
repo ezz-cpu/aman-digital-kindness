@@ -10,7 +10,7 @@ const files = [
   'signup.html', 'dashboard.html', 'privacy.html', 'tobi.html', 'tobi-studio.html',
   'styles.css', 'aman-experience.css', 'script.js', 'aman-scene.bundle.js',
   'tobi.css', 'tobi-refresh.css', 'tobi.bundle.js', 'favicon.svg',
-  '1.png', '9.png', 'save-world-preview.png',
+  '1.png', '9.png', 'save-world-preview.png', 'aman-social-preview.png',
   'tobi-assets/tobi.svg', 'tobi-assets/tobi-blink.svg', 'tobi-assets/tobi-jump.svg',
   'tobi-assets/original-background.jpg', 'vendor/three/LICENSE.txt',
 ];

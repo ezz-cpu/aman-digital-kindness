@@ -16,6 +16,16 @@ Run `npm run build:browser` followed by `npm run build:pages` to generate the pu
 
 Vercel instead runs `npm run build:vercel`: it builds the browser bundles and copies only the public allowlist to `release/vercel/`, retaining the real login pages. `/api/*` is routed to one private Node.js function. Deployment settings and server modules are never copied to the public directory. Configure production database credentials and secrets in Vercel, and select its Hobby plan.
 
+## Google Search (free)
+
+The public pages include individual Arabic titles and descriptions, canonical URLs, readable initial HTML, and sharing previews. The homepage identifies the site as **أمان / Aman Digital Kindness** using WebSite structured data. The English switch remains available in the browser; separate English URLs are not advertised.
+
+`robots.txt` points to `https://aman-digital-kindness.vercel.app/sitemap.xml`, which contains the six public educational and privacy pages. Login, signup, dashboard, and Tobi Studio have `noindex` metadata; API responses are also marked `noindex`. Keep those pages crawlable so search engines can read the directive. These indexing directives do not replace authentication.
+
+Use a **URL-prefix property** for `https://aman-digital-kindness.vercel.app/` in Google Search Console. The homepage includes the owner's public HTML verification tag; preserve it when editing the page. Once ownership is verified, submit `sitemap.xml` and use URL Inspection to request indexing of the homepage. Search Console, sitemap submission, and organic search inclusion have no Google fee. The existing free hosting URL is sufficient; a custom domain or advertising is optional. Submission does not guarantee indexing, timing, or rankings.
+
+Run `npm test` and `npm run build:vercel` after changing public metadata or discovery files. Keep the public-file and packaging allowlists in sync when adding assets. Update the initial educational HTML alongside the corresponding JavaScript-rendered copy when changing page content.
+
 ## Run locally
 
 On this Windows computer, double-click **Open Aman.cmd** to start the website and open it in your browser. The launcher reuses an already running Aman server. Directly opening index.html also displays the 3D scene, but accounts and AI need the server.

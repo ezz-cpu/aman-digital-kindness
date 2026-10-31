@@ -4,6 +4,7 @@ export const publicFiles = [
   'index.html', 'about.html', 'resources.html', 'interactive.html', 'login.html',
   'signup.html', 'dashboard.html', 'privacy.html', 'tobi.html', 'tobi-studio.html',
   'styles.css', 'script.js', 'favicon.svg', '1.png', '9.png', 'save-world-preview.png',
+  'robots.txt', 'sitemap.xml', 'aman-social-preview.png',
   'aman-experience.css', 'aman-scene.js', 'aman-scene.bundle.js',
   'tobi.js', 'tobi-content.js', 'tobi.bundle.js', 'tobi.css', 'tobi-refresh.css',
   'tobi-assets/tobi.svg', 'tobi-assets/tobi-blink.svg', 'tobi-assets/tobi-jump.svg',
